@@ -1,3 +1,38 @@
+# Criar ponto de restauração (precisa estar como administrador)
+function CriarPontoDeRestauracao {
+    Write-Host "Criando ponto de restauração do sistema..." -ForegroundColor Cyan
+
+    # Verifica se o serviço está ativo
+    $srStatus = Get-Service -Name 'vss' -ErrorAction SilentlyContinue
+    if ($srStatus.Status -ne 'Running') {
+        Start-Service -Name 'vss' -ErrorAction SilentlyContinue
+    }
+    $script = @'
+$restore = Get-CimInstance -Namespace "root/default" -ClassName SystemRestore
+if (-not $restore) {
+    Enable-ComputerRestore -Drive "C:\"
+}
+Checkpoint-Computer -Description "Ponto criado por script" -RestorePointType "MODIFY_SETTINGS"
+'@
+
+    try {
+        Invoke-Command -ScriptBlock ([ScriptBlock]::Create($script))
+        Write-Host "Ponto de restauração criado com sucesso." -ForegroundColor Green
+    } catch {
+        Write-Warning "Falha ao criar ponto de restauração. Você está como Administrador?"
+    }
+}
+
+# Verifica se está com permissão de administrador
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
+    [Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Warning "Este script precisa ser executado como Administrador. Reabrindo com permissões elevadas..."
+    Start-Process powershell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    exit
+}
+
+CriarPontoDeRestauracao
+
 
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
     [Security.Principal.WindowsBuiltInRole] "Administrator")) {
